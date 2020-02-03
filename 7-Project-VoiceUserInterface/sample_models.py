@@ -156,13 +156,15 @@ def bidirectional_rnn_model(input_dim, units, output_dim=29):
 def final_model(input_dim, units, recur_layers, output_dim=29):
     """ Build a deep recurrent network for speech 
     """       
-    # Main acoustic input
-    input_data = Input(name='the_input', shape=(None, input_dim))
     filters = 200
     kernel_size = 11
     strides= 2
     padding='valid'
     pool_size = 2
+    
+    
+    input_data = Input(name='the_input', shape=(None, input_dim))
+
     conv_1d = Conv1D(filters = filters,
                      kernel_size = kernel_size, 
                      strides= strides, 
@@ -170,11 +172,11 @@ def final_model(input_dim, units, recur_layers, output_dim=29):
                      activation='relu',
                      name='conv1d')(input_data)
     pooled_layer = AveragePooling1D(pool_size=pool_size, strides=None, padding='valid')(conv_1d)
-    # Add batch normalization
     bn_cnn = BatchNormalization(name='bn_conv_1d')(pooled_layer)
+    
     drop_out = Dropout(rate = 0.3, noise_shape=None, seed=None)(bn_cnn)
+    
     rnn_input = drop_out
-    # TODO: Add recurrent layers, each with batch normalization
     for i in range(recur_layers):
         simp_rnn = Bidirectional(LSTM(units,
                                       activation='relu',
@@ -183,17 +185,14 @@ def final_model(input_dim, units, recur_layers, output_dim=29):
                                       dropout=0.3,
                                       recurrent_dropout=0.1,
                                       name='rnn_' + str(i)))(rnn_input)
-#         simp_rnn = GRU(units, activation='relu',
-#             return_sequences=True, implementation=2, dropout = 0.25, name=str(i))
-        # TODO: Add batch normalization 
         bn_rnn = BatchNormalization()(simp_rnn)
         rnn_input = bn_rnn
         
-    # TODO: Add a TimeDistributed(Dense(output_dim)) layer
+
     time_dense = TimeDistributed(Dense(output_dim))(bn_rnn)
-    # Add softmax activation layer
+
     y_pred = Activation('softmax', name='softmax')(time_dense)
-    # Specify the model
+
     model = Model(inputs=input_data, outputs=y_pred)
     model.output_length = lambda x: cnn_output_length_final_model(
         x, kernel_size, padding, strides, pool_size)
