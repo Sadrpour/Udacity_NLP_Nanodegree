@@ -1,7 +1,8 @@
 from keras import backend as K
 from keras.models import Model
-from keras.layers import (BatchNormalization, Conv1D, Dense, Input, 
+from keras.layers import (BatchNormalization, Conv1D, Dense, Input,
     TimeDistributed, Activation, Bidirectional, SimpleRNN, GRU, LSTM, LSTMCell, RNN, AveragePooling1D, MaxPooling1D, Dropout)
+
 
 def simple_rnn_model(input_dim, output_dim=29):
     """ Build a recurrent network for speech 
@@ -155,7 +156,7 @@ def bidirectional_rnn_model(input_dim, units, output_dim=29):
 
 def final_model(input_dim, units, recur_layers, output_dim=29):
     """ Build a deep recurrent network for speech 
-    """       
+    """
     filters = 512
     kernel_size = 11
     strides= 2
@@ -164,6 +165,7 @@ def final_model(input_dim, units, recur_layers, output_dim=29):
     
     
     input_data = Input(name='the_input', shape=(None, input_dim))
+
 
     conv_1d = Conv1D(filters = filters,
                      kernel_size = kernel_size, 
@@ -174,9 +176,19 @@ def final_model(input_dim, units, recur_layers, output_dim=29):
     pooled_layer = MaxPooling1D(pool_size=pool_size, strides=None, padding='valid')(conv_1d)
     bn_cnn = BatchNormalization(name='bn_conv_1d')(pooled_layer)
     drop_out = Dropout(rate = 0.2, noise_shape=None, seed=None)(bn_cnn)
-#     bn_cnn = BatchNormalization(name='bn_conv_1d')(conv_1d)    
+#     bn_cnn = BatchNormalization(name='bn_conv_1d')(conv_1d)
 
-    
+
+    conv_1d = Conv1D(filters = filters,
+                     kernel_size = kernel_size,
+                     strides= strides,
+                     padding=padding,
+                     activation='relu',
+                     name='conv1d')(input_data)
+    pooled_layer = AveragePooling1D(pool_size=pool_size, strides=None, padding='valid')(conv_1d)
+    bn_cnn = BatchNormalization(name='bn_conv_1d')(pooled_layer)
+
+
 #     rnn_input = drop_out
     rnn_input = drop_out
     for i in range(recur_layers):
@@ -204,6 +216,7 @@ def final_model(input_dim, units, recur_layers, output_dim=29):
         
     time_dense = TimeDistributed(Dense(output_dim))(rnn_input)
 
+
     y_pred = Activation('softmax', name='softmax')(time_dense)
 
     model = Model(inputs=input_data, outputs=y_pred)
@@ -211,5 +224,6 @@ def final_model(input_dim, units, recur_layers, output_dim=29):
         x, kernel_size, padding, strides, pool_size)
 #     model.output_length = lambda x: cnn_output_length(
 #         x, kernel_size, padding, strides, pool_size)
+
     print(model.summary())
     return model
