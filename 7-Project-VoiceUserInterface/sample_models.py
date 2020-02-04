@@ -1,7 +1,7 @@
 from keras import backend as K
 from keras.models import Model
 from keras.layers import (BatchNormalization, Conv1D, Dense, Input, 
-    TimeDistributed, Activation, Bidirectional, SimpleRNN, GRU, LSTM, LSTMCell, RNN, AveragePooling1D, Dropout)
+    TimeDistributed, Activation, Bidirectional, SimpleRNN, GRU, LSTM, LSTMCell, RNN, AveragePooling1D, MaxPooling1D, Dropout)
 
 def simple_rnn_model(input_dim, output_dim=29):
     """ Build a recurrent network for speech 
@@ -156,7 +156,7 @@ def bidirectional_rnn_model(input_dim, units, output_dim=29):
 def final_model(input_dim, units, recur_layers, output_dim=29):
     """ Build a deep recurrent network for speech 
     """       
-    filters = 200
+    filters = 512
     kernel_size = 11
     strides= 2
     padding='valid'
@@ -171,30 +171,45 @@ def final_model(input_dim, units, recur_layers, output_dim=29):
                      padding=padding,
                      activation='relu',
                      name='conv1d')(input_data)
-    pooled_layer = AveragePooling1D(pool_size=pool_size, strides=None, padding='valid')(conv_1d)
+    pooled_layer = MaxPooling1D(pool_size=pool_size, strides=None, padding='valid')(conv_1d)
     bn_cnn = BatchNormalization(name='bn_conv_1d')(pooled_layer)
+    drop_out = Dropout(rate = 0.2, noise_shape=None, seed=None)(bn_cnn)
+#     bn_cnn = BatchNormalization(name='bn_conv_1d')(conv_1d)    
+
     
-    drop_out = Dropout(rate = 0.3, noise_shape=None, seed=None)(bn_cnn)
-    
+#     rnn_input = drop_out
     rnn_input = drop_out
     for i in range(recur_layers):
-        simp_rnn = Bidirectional(LSTM(units,
-                                      activation='relu',
-                                      return_sequences=True,
-                                      implementation=2,
-                                      dropout=0.3,
-                                      recurrent_dropout=0.1,
-                                      name='rnn_' + str(i)))(rnn_input)
+        simp_rnn = Bidirectional(GRU(units,
+                                     activation='relu',
+                                     return_sequences=True,
+                                     implementation=2,
+                                     name='rnn_' + str(i)))(rnn_input)
         bn_rnn = BatchNormalization()(simp_rnn)
-        rnn_input = bn_rnn
+        drop_out_rnn = Dropout(rate = 0.3, noise_shape=None, seed=None, name='rnn_dropout' + str(i))(bn_rnn)
+        rnn_input = drop_out_rnn
         
-
-    time_dense = TimeDistributed(Dense(output_dim))(bn_rnn)
+#     for i in range(recur_layers):
+#         simp_rnn = GRU(units,
+#                       activation='relu',
+#                       return_sequences=True,
+#                       implementation=2,
+#                       dropout=0.2,
+#                       recurrent_dropout=0.1,
+#                       name='rnn_' + str(i))(rnn_input)
+#         bn_rnn = BatchNormalization()(simp_rnn)
+#         drop_out_rnn = Dropout(rate = 0.2, noise_shape=None, seed=None, name='rnn_dropout' + str(i))(bn_rnn)
+#         rnn_input = drop_out_rnn
+        
+        
+    time_dense = TimeDistributed(Dense(output_dim))(rnn_input)
 
     y_pred = Activation('softmax', name='softmax')(time_dense)
 
     model = Model(inputs=input_data, outputs=y_pred)
     model.output_length = lambda x: cnn_output_length_final_model(
         x, kernel_size, padding, strides, pool_size)
+#     model.output_length = lambda x: cnn_output_length(
+#         x, kernel_size, padding, strides, pool_size)
     print(model.summary())
     return model
